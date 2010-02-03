@@ -7,6 +7,15 @@ Provides an API and a basic UI for key based authentication. Modeled after
 services_keyauth module.
 
 
+Requirements
+------------
+
+CTools
+http://drupal.org/project/ctools
+
+PHP 5.2.x
+
+
 Installation
 ------------
 
