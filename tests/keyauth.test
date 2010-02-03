@@ -1,0 +1,84 @@
+<?php
+
+/**
+ * Unit tests for key auth.
+ *
+ */
+class KeyAuthWebTestCase extends DrupalWebTestCase {
+  /**
+   * Describe this test.
+   */
+  public function getInfo() {
+    return array(
+      'name' => t('Unit tests'),
+      'description' => t('Test authentication methods.'),
+      'group' => t('KeyAuth'),
+    );
+  }
+
+  /**
+   * Set up test.
+   */
+  public function setUp() {
+    parent::setUp('ctools', 'keyauth');
+  }
+
+  /**
+   * Run tests.
+   */
+  public function test() {
+    // Set up a key.
+    keyauth_include();
+    $key = keyauth_save('Test key');
+    $result = db_query('SELECT * FROM {keyauth_keys}');
+    while ($row = db_fetch_object($result)) {
+      $this->assert('pass', print_r($row, true));
+    }
+
+    // Sign a message, verify it. It should only verify once.
+    list($nonce, $timestamp, $hash) = keyauth_sign($key['public_key'], 'Lorem ipsum');
+    $this->assert('pass', 'Nonce: '. $nonce);
+    $this->assert('pass', 'Timestamp: '. $timestamp);
+    $this->assert('pass', 'Hash: '. $hash);
+    $this->assertTrue(keyauth_verify($key['public_key'], 'Lorem ipsum', $nonce, $timestamp, $hash), 'Verified message.');
+    keyauth_cron();
+    $this->assertFalse(keyauth_verify($key['public_key'], 'Lorem ipsum', $nonce, $timestamp, $hash), 'Verification of message failed.');
+    $this->assertFalse(keyauth_verify($key['public_key'], 'Lorem ipsum', $nonce, $timestamp, $hash), 'Verification of message failed.');
+
+    // Try again with new signature.
+    list($nonce, $timestamp, $hash) = keyauth_sign($key['public_key'], 'Lorem ipsum');
+    $this->assertTrue(keyauth_verify($key['public_key'], 'Lorem ipsum', $nonce, $timestamp, $hash), 'Verified message.');
+
+    // Try with random key - should fail.
+    list($nonce, $timestamp, $hash) = keyauth_sign($key['public_key'], 'Lorem ipsum');
+    $this->assertFalse(keyauth_verify($key['public_key'], 'Lorem ipsum', $nonce, $timestamp, hash_hmac(KEYAUTH_ALGORITHM, 'Lorem ipsum', $key['public_key'])), 'Verification of message failed.');
+
+    // Test URL signing.
+    $key = keyauth_save('New key');
+    foreach ($this->myTestURLs() as $url) {
+      $this->assert('pass', 'Test '. $url);
+      $signed = keyauth_sign_url($key['public_key'], $url);
+      $this->assert('pass', 'Test URL '. $url);
+      $this->assert('pass', 'Signed URL '. $signed);
+      $this->assertTrue(keyauth_verify_url($signed));
+      keyauth_cron();
+      $this->assertFalse(keyauth_verify_url($signed));
+    }
+  }
+
+  /**
+   * A series of test URLs.
+   */
+  public function myTestURLs() {
+    return array(
+      'http://example.com/blog/feed',
+      'http://example.com/blog/feed?',
+      'http://example.com/blog/feed?view=top',
+      'http://example.com/blog/feed?view=top&',
+      'http://example.com/blog/feed?view=top&mode=map',
+      'http://example.com/blog/feed?view=top&mode=tense#toc',
+      'http://example.com/blog/feed?view=top&mode=tense&#toc',
+      'http://example.com/user/feed?openid=http%3A%2F%2Flocalhost%2Fop%2Fuser%2F22%2Fidentity',
+    );
+  }
+}
