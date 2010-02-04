@@ -222,14 +222,14 @@ function keyauth_verify_url($url) {
     $key = urldecode($query['key']);
     $nonce = urldecode($query['nonce']);
     $timestamp = $query['timestamp'];
+    // Normalize URL.
+    list($scheme, $url, $fragment) = keyauth_normalize_url($url);
+    // Verify.
+    return keyauth_verify($key, $url, $nonce, $timestamp, $hash);
   }
   else {
     return FALSE;
   }
-  // Normalize URL.
-  list($scheme, $url, $fragment) = keyauth_normalize_url($url);
-  // Verify.
-  return keyauth_verify($key, $url, $nonce, $timestamp, $hash);
 }
 
 /**
